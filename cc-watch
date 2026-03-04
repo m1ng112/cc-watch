@@ -1,0 +1,190 @@
+#!/usr/bin/env zsh
+# cc-watch: Claude Code の待機状態 pane を一覧表示・選択してジャンプ
+
+setopt NO_UNSET PIPE_FAIL
+
+LINES_TO_CHECK=12
+
+C_RED=$'\033[38;5;203m'
+C_YEL=$'\033[38;5;221m'
+C_GRN=$'\033[38;5;114m'
+C_CYN=$'\033[38;5;81m'
+C_DIM=$'\033[2m'
+C_RST=$'\033[0m'
+
+typeset -A WAIT_PATTERNS
+WAIT_PATTERNS[approval]="Do you want to proceed|Would you like to|Shall I|should I proceed|Run anyway|Allow|Deny"
+WAIT_PATTERNS[yesno]="\(y/n\)|\(Y/n\)|\(yes/no\)|Yes/No"
+WAIT_PATTERNS[enter]="Press Enter|press enter|Hit Enter|\[Enter\]"
+WAIT_PATTERNS[cost]="API Cost|tokens used|cost estimate"
+WAIT_PATTERNS[prompt]="^[[:space:]]*❯[[:space:]]*$"
+typeset -a PATTERN_ORDER=(approval yesno enter cost prompt)
+
+typeset -A TYPE_ICON TYPE_COLOR TYPE_LABEL
+TYPE_ICON[approval]="!"  TYPE_COLOR[approval]=$C_RED  TYPE_LABEL[approval]="確認待ち"
+TYPE_ICON[yesno]="?"     TYPE_COLOR[yesno]=$C_YEL    TYPE_LABEL[yesno]="Yes / No"
+TYPE_ICON[enter]="↵"     TYPE_COLOR[enter]=$C_CYN    TYPE_LABEL[enter]="Enter待ち"
+TYPE_ICON[cost]="$"      TYPE_COLOR[cost]=$C_YEL     TYPE_LABEL[cost]="コスト確認"
+TYPE_ICON[prompt]="›"    TYPE_COLOR[prompt]=$C_GRN   TYPE_LABEL[prompt]="入力待ち"
+
+get_pane_tail() {
+  tmux capture-pane -p -t "$1" -e 2>/dev/null \
+    | sed $'s/\x1b\[[0-9;]*[mKHJA-Za-z]//g' \
+    | sed '/^[[:space:]]*$/d' \
+    | tail -n "${2:-$LINES_TO_CHECK}"
+}
+
+is_claude_pane() {
+  local pid children child comm cmdline
+  pid=$(tmux display-message -t "$1" -p "#{pane_pid}" 2>/dev/null) || return 1
+  children=$(pgrep -P "$pid" 2>/dev/null) || return 1
+  for child in ${(f)children}; do
+    comm=$(ps -p "$child" -o comm= 2>/dev/null | sed 's|.*/||')
+    [[ "$comm" =~ ^(claude|claude-code)$ ]] && return 0
+    if [[ "$comm" == "node" ]]; then
+      cmdline=$(ps -p "$child" -o args= 2>/dev/null)
+      [[ "$cmdline" =~ claude ]] && return 0
+    fi
+  done
+  return 1
+}
+
+has_claude_ui() {
+  print "$1" | grep -qE "✻ (Thinking|Cooked|Crunched|Cogitated|Pondered)|⏺ |─{4,}"
+}
+
+detect_type() {
+  local content=$1 is_claude=$2 k regex
+  for k in $PATTERN_ORDER; do
+    regex=$WAIT_PATTERNS[$k]
+    if print "$content" | grep -qE "$regex"; then
+      [[ "$k" == "prompt" && "$is_claude" != "true" ]] && continue
+      print "$k"; return 0
+    fi
+  done
+  print ""
+}
+
+typeset -ga R_IDS R_NAMES R_TYPES
+
+scan_panes() {
+  R_IDS=(); R_NAMES=(); R_TYPES=()
+  local line pane_id session win pane wname tail proc_ok ui_ok eff wtype name
+
+  while read -r line; do
+    [[ -z "$line" ]] && continue
+    pane_id=${line%%|*}; line=${line#*|}
+    session=${line%%|*};  line=${line#*|}
+    win=${line%%|*};      line=${line#*|}
+    pane=${line%%|*}
+    wname=${line#*|}
+
+    tail=$(get_pane_tail "$pane_id") || continue
+
+    proc_ok=false; is_claude_pane "$pane_id" 2>/dev/null && proc_ok=true
+    ui_ok=false;   has_claude_ui "$tail"                  && ui_ok=true
+    [[ "$proc_ok" == false && "$ui_ok" == false ]] && continue
+
+    eff=$ui_ok; [[ "$proc_ok" == true ]] && eff=true
+    wtype=$(detect_type "$tail" "$eff")
+    [[ -z "$wtype" ]] && continue
+
+    if [[ -n "$wname" && "$wname" != "$win" ]]; then
+      name="${session}:${win}: ${wname}"
+    else
+      name="${session}:${win}"
+    fi
+
+    R_IDS+=("$pane_id")
+    R_NAMES+=("$name")
+    R_TYPES+=("$wtype")
+  done < <(tmux list-panes -a \
+    -F "#{pane_id}|#{session_name}|#{window_index}|#{pane_index}|#{window_name}" 2>/dev/null)
+}
+
+pick_fzf() {
+  scan_panes
+  local n=${#R_IDS}
+
+  if (( n == 0 )); then
+    printf "${C_DIM}$(date '+%H:%M:%S')  ${C_RST}${C_GRN}✓ 待機なし${C_RST}\n"
+    return
+  fi
+
+  # fzf に渡す行: "表示テキスト\tpane_id"
+  local lines=() i wtype icon color label name
+  for (( i = 1; i <= n; i++ )); do
+    wtype=$R_TYPES[$i]
+    icon=$TYPE_ICON[$wtype]
+    color=$TYPE_COLOR[$wtype]
+    label=$TYPE_LABEL[$wtype]
+    name=$R_NAMES[$i]
+    lines+=("$(printf "${C_DIM}(%d)${C_RST}  ${color}%s  %-10s${C_RST}  %s\t%s" \
+      "$i" "$icon" "$label" "$name" "$R_IDS[$i]")")
+  done
+
+  # プレビュー: pane_id を使って tmux capture-pane を実行
+  local preview_cmd='pane_id=$(echo {} | cut -f2); tmux capture-pane -p -e -t "$pane_id" 2>/dev/null | tail -30'
+
+  local selected
+  selected=$(printf '%s\n' "${lines[@]}" \
+    | fzf --ansi \
+          --no-sort \
+          --with-nth=1 \
+          --delimiter=$'\t' \
+          --prompt="  " \
+          --height=80% \
+          --border=rounded \
+          --header="$(printf "${C_DIM}cc-watch  %d session(s) waiting${C_RST}" "$n")" \
+          --no-info \
+          --preview="$preview_cmd" \
+          --preview-window="down:60%:wrap" \
+    | cut -f2)
+
+  [[ -n "$selected" ]] && tmux switch-client -t "$selected"
+}
+
+pick_interactive() {
+  scan_panes
+  local n=${#R_IDS}
+
+  if (( n == 0 )); then
+    printf "${C_DIM}$(date '+%H:%M:%S')  ${C_RST}${C_GRN}✓ 待機なし${C_RST}\n"
+    return
+  fi
+
+  clear
+  printf "${C_DIM}── cc-watch  %d session(s) waiting ──${C_RST}\n\n" "$n"
+
+  local i wtype icon color label name
+  for (( i = 1; i <= n; i++ )); do
+    wtype=$R_TYPES[$i]
+    icon=$TYPE_ICON[$wtype]
+    color=$TYPE_COLOR[$wtype]
+    label=$TYPE_LABEL[$wtype]
+    name=$R_NAMES[$i]
+    printf "${C_DIM}(%d)${C_RST}  ${color}%s  %-10s${C_RST}  %s\n" \
+      "$i" "$icon" "$label" "$name"
+    # pane の末尾を indent して表示
+    get_pane_tail "$R_IDS[$i]" 6 | sed 's/^/      /'
+    print ""
+  done
+
+  printf "${C_DIM}番号を入力して Enter（q で終了）: ${C_RST}"
+  local input; read -r input
+
+  [[ "$input" == "q" || -z "$input" ]] && return
+
+  if [[ "$input" =~ ^[0-9]+$ ]] && (( input >= 1 && input <= n )); then
+    tmux switch-client -t "$R_IDS[$input]"
+  else
+    printf "${C_RED}無効な番号です${C_RST}\n"; sleep 1
+    pick_interactive
+  fi
+}
+
+if command -v fzf &>/dev/null; then
+  pick_fzf
+else
+  pick_interactive
+fi
