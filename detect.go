@@ -24,6 +24,16 @@ type waitPattern struct {
 	pattern *regexp.Regexp
 }
 
+// spinnerRegex matches Claude's active "busy" spinner line (elapsed-time /
+// token counter, or the "esc to interrupt" hint). It is rendered only while
+// Claude is actually generating, so its absence means Claude is not busy.
+var spinnerRegex = regexp.MustCompile(`…\s*\([0-9]+m?\s?[0-9]*s\b|\(esc to interrupt\)`)
+
+// hasSpinner reports whether the captured content shows the active spinner.
+func hasSpinner(content string) bool {
+	return spinnerRegex.MatchString(content)
+}
+
 // Ordered by priority (first match wins).
 var waitPatterns = []waitPattern{
 	// Plan-mode approval (ExitPlanMode). "No, keep planning" is the last option
@@ -45,7 +55,7 @@ var waitPatterns = []waitPattern{
 	// while Claude is generating, making it the one reliable "busy" signal.
 	// A leftover ⏺ bullet, by contrast, stays on screen after Claude finishes,
 	// so it must NOT be treated as busy.
-	{WaitRunning, regexp.MustCompile(`…\s*\([0-9]+m?\s?[0-9]*s\b|\(esc to interrupt\)`)},
+	{WaitRunning, spinnerRegex},
 	// Empty input box: the prompt glyph followed only by whitespace, including
 	// the non-breaking space (U+00A0) Claude Code emits. Present when Claude has
 	// finished its turn and is waiting for the user to respond.

@@ -138,13 +138,26 @@ func TestResolveWaitType(t *testing.T) {
 		t.Errorf("stale idle hook + on-screen prompt should surface via scraping: got %v, want WaitQuestion", got)
 	}
 
-	// But a *running* hook suppresses incidental prompt-like text, avoiding
-	// false positives while Claude is actively generating.
+	// A running hook suppresses scraping ONLY while the spinner is on screen
+	// (Claude is actually generating); incidental prompt-like text then does
+	// not cause a false positive.
+	spinnerWithPrompt := "✶ Working… (3s · ↓ 1.0k tokens)\n❯ 1. A案\n  2. B案"
 	if err := writeStatus("%6", "running", time.Unix(1, 0)); err != nil {
 		t.Fatal(err)
 	}
-	if got := resolveWaitType("%6", questionTail, true); got != WaitRunning {
-		t.Errorf("running hook should suppress scraping attention: got %v, want WaitRunning", got)
+	if got := resolveWaitType("%6", spinnerWithPrompt, true); got != WaitRunning {
+		t.Errorf("running hook + spinner should suppress scraping: got %v, want WaitRunning", got)
+	}
+
+	// But a running hook with NO spinner and a blocking prompt on screen means
+	// the hook went stale (e.g. a tool-permission prompt fires no hook): the
+	// screen wins. This is the docker/Bash permission case.
+	if err := writeStatus("%8", "running", time.Unix(1, 0)); err != nil {
+		t.Fatal(err)
+	}
+	approvalTail := "  ls /etc\n Do you want to proceed?\n ❯ 1. Yes\n   2. No\n Esc to cancel"
+	if got := resolveWaitType("%8", approvalTail, true); got != WaitApproval {
+		t.Errorf("running hook but no spinner + permission prompt should surface: got %v, want WaitApproval", got)
 	}
 
 	// No hook + on-screen prompt -> scraping attention.

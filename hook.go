@@ -110,13 +110,14 @@ func resolveWaitType(paneID, tail string, isClaude bool) WaitType {
 		hookWT, hookOK = stateToWaitType(st.State)
 	}
 
-	// Safety net: when the screen clearly shows a blocking prompt and the hook
-	// is not actively tracking a running turn (no hook, or it went stale at
-	// "idle"), trust the screen. This surfaces prompts the hooks miss — e.g. a
-	// tool-permission dialog whose Notification hook may not fire while the pane
-	// is focused — without letting incidental prompt-like text in a *running*
-	// pane cause false positives.
-	if needsAttention(scraped) && (!hookOK || st.State == "idle") {
+	// Safety net: when the screen shows a blocking prompt and Claude is not
+	// actually generating (no active spinner), trust the screen — even over a
+	// "running" hook. A tool-permission prompt (e.g. Bash/Edit) fires no
+	// state-updating hook, so the hook stays "running" from the prompt submit
+	// while the screen blocks on the prompt. The spinner is the reliable "busy"
+	// signal: while it shows, incidental prompt-like text is ignored, avoiding
+	// false positives during generation.
+	if needsAttention(scraped) && !hasSpinner(tail) {
 		return scraped
 	}
 	if hookOK {
