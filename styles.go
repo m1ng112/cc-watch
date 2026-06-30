@@ -3,18 +3,20 @@ package main
 import lipgloss "charm.land/lipgloss/v2"
 
 var (
-	colorRed    = lipgloss.Color("#e06c75")
-	colorYellow = lipgloss.Color("#e5c07b")
-	colorGreen  = lipgloss.Color("#98c379")
-	colorCyan   = lipgloss.Color("#56b6c2")
+	colorRed     = lipgloss.Color("#e06c75")
+	colorYellow  = lipgloss.Color("#e5c07b")
+	colorGreen   = lipgloss.Color("#98c379")
+	colorCyan    = lipgloss.Color("#56b6c2")
 	colorDim     = lipgloss.Color("#5c6370")
 	colorBlue    = lipgloss.Color("#61afef")
 	colorMagenta = lipgloss.Color("#c678dd")
 
+	stylePlan     = lipgloss.NewStyle().Foreground(colorBlue)
 	styleApproval = lipgloss.NewStyle().Foreground(colorRed)
 	styleYesNo    = lipgloss.NewStyle().Foreground(colorYellow)
 	styleEnter    = lipgloss.NewStyle().Foreground(colorCyan)
 	styleCost     = lipgloss.NewStyle().Foreground(colorYellow)
+	styleQuestion = lipgloss.NewStyle().Foreground(colorYellow)
 	stylePrompt   = lipgloss.NewStyle().Foreground(colorGreen)
 	styleThinking = lipgloss.NewStyle().Foreground(colorBlue)
 	styleRunning  = lipgloss.NewStyle().Foreground(colorMagenta)
@@ -25,6 +27,8 @@ var (
 
 func waitStyle(wt WaitType) lipgloss.Style {
 	switch wt {
+	case WaitPlan:
+		return stylePlan
 	case WaitApproval:
 		return styleApproval
 	case WaitYesNo:
@@ -33,6 +37,8 @@ func waitStyle(wt WaitType) lipgloss.Style {
 		return styleEnter
 	case WaitCost:
 		return styleCost
+	case WaitQuestion:
+		return styleQuestion
 	case WaitPrompt:
 		return stylePrompt
 	case WaitThinking:
