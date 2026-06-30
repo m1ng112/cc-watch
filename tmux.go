@@ -129,10 +129,7 @@ func scanAllPanes() []PaneInfo {
 		}
 
 		isClaude := procOK || uiOK
-		wtype := detectType(tail, isClaude)
-		if wtype == WaitNone {
-			wtype = WaitActive
-		}
+		wtype := resolveWaitType(paneID, tail, isClaude)
 
 		var name string
 		if wname != "" && wname != win {

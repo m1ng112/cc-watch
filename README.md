@@ -20,17 +20,33 @@ Auto-refreshes every 3 seconds so you never miss a prompt.
 └────────────────────────────────────────────────────────────────┘
 ```
 
-## Detected Wait States
+## Detected States
 
-| Icon | Label | Detection Pattern |
-|------|-------|-------------------|
-| `!` | Approval | `Do you want to proceed`, `Allow`, `Deny` |
-| `?` | Yes / No | `(y/n)`, `(yes/no)` |
-| `↵` | Enter | `Press Enter`, `[Enter]` |
-| `$` | Cost | `API Cost`, `tokens used` |
-| `›` | Prompt | Prompt character (`❯`) |
-| `✻` | Thinking | `✻ Thinking` / `Pondered` etc. |
-| `⏺` | Running | Tool execution indicator |
+| Icon | Label (JA) | Meaning |
+|------|------------|---------|
+| `✓` | 承認待ち | Waiting for plan approval (ExitPlanMode) |
+| `!` | 確認待ち | Waiting for command/tool permission |
+| `▸` | 回答待ち | Blocked on a multiple-choice question (AskUserQuestion) |
+| `?` | Yes / No | A `(y/n)` prompt |
+| `↵` | Enter待ち | `Press Enter` etc. |
+| `$` | コスト確認 | `API Cost` etc. |
+| `›` | 指示待ち | Turn finished, idle waiting for the next instruction (empty prompt) |
+| `⏺` | 実行中 | Generating (spinner) |
+| `·` | 動作中 | Fallback when nothing could be determined |
+
+## Detection: hooks (recommended) and scraping
+
+cc-watch determines state two ways:
+
+1. **Claude Code hooks (recommended, reliable)** — running `cc-watch install-hooks` registers hooks in `~/.claude/settings.json`. Each Claude session then reports its state transitions (start / finish / approval / permission / question) directly to cc-watch, tagged with `$TMUX_PANE`. This is layout-independent and accurate.
+2. **Terminal scraping (fallback)** — for panes without hooks (or sessions outside tmux), the pane tail is parsed with regexes to infer state.
+
+```sh
+# Register hooks (your existing settings are backed up; other hooks are preserved)
+cc-watch install-hooks
+```
+
+> Newly registered hooks do not apply to already-running Claude Code sessions — restart them or check `/hooks`. Only Claude started inside tmux can be correlated.
 
 ## Requirements
 
