@@ -48,6 +48,24 @@ cc-watch install-hooks
 
 > 登録後、既存の Claude Code セッションには反映されません。各セッションを再起動するか `/hooks` で確認してください。tmux 内で起動した Claude のみ対応付け可能です。
 
+## ステータスバーに常時表示（cc-watch status）
+
+常時サイドバー（cmux 風）は画面を占有して邪魔、毎回 popup を出すのも手間 — その中間として、tmux のステータスバーに**注意が必要なペインだけ**を常時1行で表示できます。
+
+```tmux
+# ~/.config/tmux/tmux.conf
+set -g status-interval 5            # 更新間隔（秒）
+set -g status-right-length 100
+# 既存の status-right の先頭に #(cc-watch status) を追加
+set -g status-right "#(cc-watch status) ...既存の内容..."
+```
+
+- `cc-watch status` は承認待ち／確認待ち／回答待ち／Yes・No／Enter待ち／コスト確認のペインを「アイコン `session:window`」で出力します（**実行中・指示待ちは出さない**、0件なら何も出さない）
+- 多い場合は先頭数件＋`+N` に集約します
+- フルの一覧表示とジャンプは従来どおり popup（例: `prefix + o`）で
+- `#()` は tmux の shell で実行されるため PATH に無ければ絶対パスを指定: `#(/path/to/cc-watch status)`
+- 正確な状態判定には `install-hooks` の併用を推奨（スクレイピングはペイン内容に左右される場合があります）
+
 ## 必要なもの
 
 - **tmux** — セッション管理

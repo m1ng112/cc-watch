@@ -10,7 +10,8 @@ import (
 // PaneInfo represents a tmux pane that is waiting for user input.
 type PaneInfo struct {
 	PaneID   string
-	Name     string
+	Name     string // verbose label for the TUI list (session:win[: window-name])
+	Loc      string // compact "session:window" for the status line
 	WaitType WaitType
 }
 
@@ -141,6 +142,7 @@ func scanAllPanes() []PaneInfo {
 		panes = append(panes, PaneInfo{
 			PaneID:   paneID,
 			Name:     name,
+			Loc:      fmt.Sprintf("%s:%s", session, win),
 			WaitType: wtype,
 		})
 	}

@@ -48,6 +48,24 @@ cc-watch install-hooks
 
 > Newly registered hooks do not apply to already-running Claude Code sessions — restart them or check `/hooks`. Only Claude started inside tmux can be correlated.
 
+## Always-on status line (cc-watch status)
+
+An always-on sidebar (cmux-style) eats screen space, and opening a popup every time is tedious. As a middle ground, embed a one-line summary of **only the panes that need attention** in the tmux status bar.
+
+```tmux
+# ~/.config/tmux/tmux.conf
+set -g status-interval 5            # refresh seconds
+set -g status-right-length 100
+# prepend #(cc-watch status) to your existing status-right
+set -g status-right "#(cc-watch status) ...your existing content..."
+```
+
+- `cc-watch status` lists panes in 承認待ち / 確認待ち / 回答待ち / Yes·No / Enter / Cost as `<icon> <session:window>` (running and idle panes are **omitted**; prints nothing when all clear).
+- When there are many, it shows the first few plus `+N`.
+- Use the popup (e.g. `prefix + o`) for the full interactive list and jumping.
+- `#()` runs in tmux's shell, so use an absolute path if cc-watch is not on PATH: `#(/path/to/cc-watch status)`.
+- For accurate state, pair it with `install-hooks` (scraping can be misled by pane content).
+
 ## Requirements
 
 - **tmux** — session management

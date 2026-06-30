@@ -21,8 +21,12 @@ func main() {
 				os.Exit(1)
 			}
 			return
+		case "status":
+			// One-line summary for the tmux status bar: #(cc-watch status).
+			fmt.Print(formatStatus(scanAllPanes()))
+			return
 		default:
-			fmt.Fprintf(os.Stderr, "cc-watch: 不明なサブコマンド %q (使用可能: hook, install-hooks)\n", os.Args[1])
+			fmt.Fprintf(os.Stderr, "cc-watch: 不明なサブコマンド %q (使用可能: hook, install-hooks, status)\n", os.Args[1])
 			os.Exit(1)
 		}
 	}

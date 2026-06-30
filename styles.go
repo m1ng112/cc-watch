@@ -2,14 +2,26 @@ package main
 
 import lipgloss "charm.land/lipgloss/v2"
 
+// Hex color values, shared by the lipgloss styles (TUI) and the tmux status
+// line markup (cc-watch status). Single source of truth.
+const (
+	hexRed     = "#e06c75"
+	hexYellow  = "#e5c07b"
+	hexGreen   = "#98c379"
+	hexCyan    = "#56b6c2"
+	hexDim     = "#5c6370"
+	hexBlue    = "#61afef"
+	hexMagenta = "#c678dd"
+)
+
 var (
-	colorRed     = lipgloss.Color("#e06c75")
-	colorYellow  = lipgloss.Color("#e5c07b")
-	colorGreen   = lipgloss.Color("#98c379")
-	colorCyan    = lipgloss.Color("#56b6c2")
-	colorDim     = lipgloss.Color("#5c6370")
-	colorBlue    = lipgloss.Color("#61afef")
-	colorMagenta = lipgloss.Color("#c678dd")
+	colorRed     = lipgloss.Color(hexRed)
+	colorYellow  = lipgloss.Color(hexYellow)
+	colorGreen   = lipgloss.Color(hexGreen)
+	colorCyan    = lipgloss.Color(hexCyan)
+	colorDim     = lipgloss.Color(hexDim)
+	colorBlue    = lipgloss.Color(hexBlue)
+	colorMagenta = lipgloss.Color(hexMagenta)
 
 	stylePlan     = lipgloss.NewStyle().Foreground(colorBlue)
 	styleApproval = lipgloss.NewStyle().Foreground(colorRed)
@@ -24,6 +36,26 @@ var (
 	styleDim       = lipgloss.NewStyle().Foreground(colorDim)
 	styleStatusBar = lipgloss.NewStyle().Foreground(colorDim)
 )
+
+// tmuxColorFor returns the hex color for a wait type, for tmux status markup.
+// Keep in sync with waitStyle.
+func tmuxColorFor(wt WaitType) string {
+	switch wt {
+	case WaitApproval:
+		return hexRed
+	case WaitYesNo, WaitCost, WaitQuestion:
+		return hexYellow
+	case WaitEnter:
+		return hexCyan
+	case WaitPlan:
+		return hexBlue
+	case WaitPrompt:
+		return hexGreen
+	case WaitRunning:
+		return hexMagenta
+	}
+	return hexDim
+}
 
 func waitStyle(wt WaitType) lipgloss.Style {
 	switch wt {
