@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	"os"
 	"os/exec"
 	"regexp"
 	"strings"
@@ -125,12 +126,19 @@ func scanAllPanes() []PaneInfo {
 
 		procOK := isClaudeProcess(panePID)
 		uiOK := hasClaudeUI(tail)
+		if os.Getenv("CC_WATCH_DEBUG") != "" {
+			fmt.Fprintf(os.Stderr, "[ccw] %s %s:%s procOK=%v uiOK=%v included=%v\n",
+				paneID, session, win, procOK, uiOK, procOK || uiOK)
+		}
 		if !procOK && !uiOK {
 			continue
 		}
 
 		isClaude := procOK || uiOK
 		wtype := resolveWaitType(paneID, tail, isClaude)
+		if os.Getenv("CC_WATCH_DEBUG") != "" {
+			fmt.Fprintf(os.Stderr, "[ccw]   %s -> %s\n", paneID, waitInfo[wtype].Label)
+		}
 
 		var name string
 		if wname != "" && wname != win {
