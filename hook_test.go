@@ -21,6 +21,10 @@ func TestEventToAction(t *testing.T) {
 		{"pretooluse ExitPlanMode -> plan", hookInput{HookEventName: "PreToolUse", ToolName: "ExitPlanMode"}, "plan", false},
 		{"pretooluse AskUserQuestion -> question", hookInput{HookEventName: "PreToolUse", ToolName: "AskUserQuestion"}, "question", false},
 		{"pretooluse Bash -> ignore", hookInput{HookEventName: "PreToolUse", ToolName: "Bash"}, "", false},
+		{"permissionrequest Edit -> approval", hookInput{HookEventName: "PermissionRequest", ToolName: "Edit"}, "approval", false},
+		{"permissionrequest Bash -> approval", hookInput{HookEventName: "PermissionRequest", ToolName: "Bash"}, "approval", false},
+		{"permissionrequest ExitPlanMode -> plan", hookInput{HookEventName: "PermissionRequest", ToolName: "ExitPlanMode"}, "plan", false},
+		{"permissionrequest AskUserQuestion -> question", hookInput{HookEventName: "PermissionRequest", ToolName: "AskUserQuestion"}, "question", false},
 		{"notification permission -> approval", hookInput{HookEventName: "Notification", Type: "permission_prompt"}, "approval", false},
 		{"notification idle -> idle", hookInput{HookEventName: "Notification", Type: "idle_prompt"}, "idle", false},
 		{"notification elicitation -> question", hookInput{HookEventName: "Notification", Type: "elicitation_dialog"}, "question", false},
@@ -121,6 +125,31 @@ func TestResolveWaitType(t *testing.T) {
 	}
 	if got := resolveWaitType("%4", spinnerTail, true); got != WaitRunning {
 		t.Errorf("unknown hook state should fall through to scraping: got %v, want WaitRunning", got)
+	}
+
+	// Safety net: a blocking prompt is on screen but the hook went stale at
+	// "idle" (e.g. a tool-permission dialog the Notification hook missed).
+	// Scraping must win so the pane still surfaces as needing attention.
+	questionTail := "どちらにしますか？\n❯ 1. A案\n  2. B案"
+	if err := writeStatus("%5", "idle", time.Unix(1, 0)); err != nil {
+		t.Fatal(err)
+	}
+	if got := resolveWaitType("%5", questionTail, true); got != WaitQuestion {
+		t.Errorf("stale idle hook + on-screen prompt should surface via scraping: got %v, want WaitQuestion", got)
+	}
+
+	// But a *running* hook suppresses incidental prompt-like text, avoiding
+	// false positives while Claude is actively generating.
+	if err := writeStatus("%6", "running", time.Unix(1, 0)); err != nil {
+		t.Fatal(err)
+	}
+	if got := resolveWaitType("%6", questionTail, true); got != WaitRunning {
+		t.Errorf("running hook should suppress scraping attention: got %v, want WaitRunning", got)
+	}
+
+	// No hook + on-screen prompt -> scraping attention.
+	if got := resolveWaitType("%7", questionTail, true); got != WaitQuestion {
+		t.Errorf("no hook + on-screen prompt: got %v, want WaitQuestion", got)
 	}
 }
 

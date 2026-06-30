@@ -31,7 +31,7 @@ var waitPatterns = []waitPattern{
 	// header off screen. Checked first so it wins over the generic approval
 	// keywords below, which a plan prompt may also contain.
 	{WaitPlan, regexp.MustCompile(`keep planning|Ready to code\?|Here is Claude's plan`)},
-	{WaitApproval, regexp.MustCompile(`Do you want to proceed|Would you like to|Shall I|should I proceed|Run anyway|Allow|Deny`)},
+	{WaitApproval, regexp.MustCompile(`Do you want to |Would you like to|Shall I|should I proceed|Run anyway|Allow|Deny`)},
 	{WaitYesNo, regexp.MustCompile(`\(y/n\)|\(Y/n\)|\(yes/no\)|Yes/No`)},
 	{WaitEnter, regexp.MustCompile(`(?i)press enter|hit enter|\[Enter\]`)},
 	{WaitCost, regexp.MustCompile(`API Cost|tokens used|cost estimate`)},

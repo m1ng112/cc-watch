@@ -43,12 +43,16 @@ func eventToAction(in hookInput) hookAction {
 		return hookAction{state: "idle"}
 	case "SessionEnd":
 		return hookAction{delete: true}
-	case "PreToolUse":
+	case "PreToolUse", "PermissionRequest":
 		switch in.ToolName {
 		case "ExitPlanMode":
 			return hookAction{state: "plan"}
 		case "AskUserQuestion":
 			return hookAction{state: "question"}
+		}
+		// Any other tool awaiting permission is a confirmation prompt.
+		if in.HookEventName == "PermissionRequest" {
+			return hookAction{state: "approval"}
 		}
 	case "Notification":
 		switch in.Type {
@@ -98,13 +102,28 @@ func shouldWrite(incoming string, cur *paneStatus, now time.Time) bool {
 // resolveWaitType determines a pane's wait state, preferring the hook-reported
 // status (event-driven, reliable) and falling back to terminal scraping.
 func resolveWaitType(paneID, tail string, isClaude bool) WaitType {
-	if st, ok := readStatus(paneID); ok {
-		if wt, ok := stateToWaitType(st.State); ok {
-			return wt
-		}
+	scraped := detectType(tail, isClaude)
+
+	st, hasHook := readStatus(paneID)
+	hookWT, hookOK := WaitNone, false
+	if hasHook {
+		hookWT, hookOK = stateToWaitType(st.State)
 	}
-	if wt := detectType(tail, isClaude); wt != WaitNone {
-		return wt
+
+	// Safety net: when the screen clearly shows a blocking prompt and the hook
+	// is not actively tracking a running turn (no hook, or it went stale at
+	// "idle"), trust the screen. This surfaces prompts the hooks miss — e.g. a
+	// tool-permission dialog whose Notification hook may not fire while the pane
+	// is focused — without letting incidental prompt-like text in a *running*
+	// pane cause false positives.
+	if needsAttention(scraped) && (!hookOK || st.State == "idle") {
+		return scraped
+	}
+	if hookOK {
+		return hookWT
+	}
+	if scraped != WaitNone {
+		return scraped
 	}
 	return WaitActive
 }

@@ -21,6 +21,7 @@ var hookEvents = []struct {
 	{"SessionStart", ""},
 	{"SessionEnd", ""},
 	{"PreToolUse", "ExitPlanMode|AskUserQuestion"},
+	{"PermissionRequest", ""},
 }
 
 // hookEntry is the command hook that invokes `cc-watch hook`. Using command +

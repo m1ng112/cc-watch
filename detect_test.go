@@ -64,6 +64,12 @@ func TestDetectType(t *testing.T) {
 		" ❯ 1. Yes\n" +
 		"   2. No"
 
+	// file-edit permission prompt ("Do you want to make this edit ...").
+	editPermission := " Do you want to make this edit to assessment_chart.py?\n" +
+		" ❯ 1. Yes\n" +
+		"   2. Yes, allow all edits during this session (shift+tab)\n" +
+		"   3. No"
+
 	// question: Claude posed a selection (e.g. AskUserQuestion) with no
 	// approval keyword. The ❯ selector points at a numbered option, so Claude
 	// is blocked waiting for the user's answer.
@@ -96,6 +102,7 @@ func TestDetectType(t *testing.T) {
 		{"plan approval (long, options only) -> 承認待ち", planLong, true, WaitPlan},
 		{"plan approval (short, header visible) -> 承認待ち", planShort, true, WaitPlan},
 		{"command permission stays 確認待ち", approval, true, WaitApproval},
+		{"edit permission -> 確認待ち", editPermission, true, WaitApproval},
 		{"yes/no prompt", yesno, true, WaitYesNo},
 		{"press enter prompt", enter, true, WaitEnter},
 		{"api cost prompt", cost, true, WaitCost},
